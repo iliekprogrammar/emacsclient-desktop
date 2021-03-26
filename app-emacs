@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# DEPENDENCY:
+#     grep
+#     sed
+#     xargs
+#     xprop
+#     systemctl
+#       emacs.service must be provided
+#     emacs
+
+shopt -s extglob
+set -o pipefail -o noclobber -o nounset
+
+# Activate the daemon
+if ! systemctl is-active --user emacs >/dev/null; then
+  systemctl restart --user emacs
+fi
+
+application=( 'emacsclient' '-na' 'emacs' )
+
+# Collect available windows
+windows="$(xprop -root _NET_CLIENT_LIST |
+  grep -oP '(?<=# )(.*)' |
+  sed 's/, /\n/g' |
+  xargs -I{} -n1 xprop -id {} WM_CLASS)"
+# Find emacs
+if [[ -z "$( grep -oiF 'emacs' <<< "$windows" )" ]]; then
+  application+=( '-c' )
+fi
+
+# Start the application
+"${application[@]}" "$@" >/dev/null 2>>"$XDG_DATA_HOME/share/nohup.txt"
+
+exit ${PIPESTATUS[0]}
